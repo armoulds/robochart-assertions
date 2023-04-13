@@ -1,0 +1,30 @@
+Manifest-Version: 1.0
+Automatic-Module-Name: circus.robocalc.robochart.assertions.ui
+Bundle-ManifestVersion: 2
+Bundle-Name: Assertions Editor UI Plugin
+Bundle-Vendor: RoboCalc Project
+Bundle-Version: 2.1.0.qualifier
+Bundle-SymbolicName: circus.robocalc.robochart.assertions.ui; singleton:=true
+Bundle-ActivationPolicy: lazy
+Require-Bundle: circus.robocalc.robochart.assertions,
+ circus.robocalc.robochart.assertions.ide,
+ org.eclipse.xtext.ui;bundle-version="2.25.0",
+ org.eclipse.xtext.ui.shared;bundle-version="2.25.0",
+ org.eclipse.xtext.ui.codetemplates.ui;bundle-version="2.25.0",
+ org.eclipse.ui.editors;bundle-version="3.14.300",
+ org.eclipse.ui.ide;bundle-version="3.18.400",
+ org.eclipse.xtext.xbase.lib;bundle-version="2.25.0",
+ org.eclipse.ui,
+ org.eclipse.core.runtime,
+ org.eclipse.compare,
+ org.eclipse.xtext.builder;bundle-version="2.25.0",
+ org.eclipse.xtend.lib;bundle-version="2.25.0";resolution:=optional,
+ org.eclipse.core.resources,
+ org.eclipse.ui.forms,
+ circus.robocalc.robochart.textual.ui;bundle-version="2.0.0"
+Import-Package: org.apache.log4j
+Bundle-RequiredExecutionEnvironment: JavaSE-11
+Export-Package: circus.robocalc.robochart.assertions.ui.contentassist,
+ circus.robocalc.robochart.assertions.ui.quickfix,
+ circus.robocalc.robochart.assertions.ui.internal
+Bundle-Activator: circus.robocalc.robochart.assertions.ui.internal.AssertionsActivator

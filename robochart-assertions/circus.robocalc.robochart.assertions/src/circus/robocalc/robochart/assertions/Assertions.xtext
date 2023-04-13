@@ -1,0 +1,639 @@
+/********************************************************************************
+ * Copyright (c) 2019 University of York and others
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * http://www.eclipse.org/legal/epl-2.0.
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *   Alvaro Miyazawa - initial definition
+ *   Pedro Ribeiro - initial definition
+ *   Kangfeng Ye - probabilistic assertions
+ ********************************************************************************/
+ 
+grammar circus.robocalc.robochart.assertions.Assertions with circus.robocalc.robochart.textual.RoboChart
+
+generate assertions "http://www.robocalc.circus/Assertions"
+
+import "http://www.robocalc.circus/RoboChart"
+import "http://www.eclipse.org/emf/2002/Ecore" as ecore
+
+RAPackage:
+	{RAPackage} ('package' name=QualifiedName)?
+	(
+		(
+			imports+=Import |
+			assertions+=Assertion |
+			processes+=CSPProcess |
+			typeInstantiations+=TypeInstantiation |
+			propConsts+=Constant|
+			consts+=Constants |
+			labels+=Label |
+			formulas+=Formula |
+			rewards+=Rewards |
+			probAssertions+=ProbAssertion |
+			defs+=Definitions |
+			pmodules+=pModules
+			// context+=RPContext
+		)*
+	 )
+;
+
+Main returns BasicPackage:
+	RAPackage
+;
+
+TypeInstantiation:
+	'instantiate' left=[PrimitiveType|QualifiedName] 'as' right=Type
+;
+
+AssertionParameter returns AssertionValueSpecification: 
+	{AssertionConstant} 'constant' variable=[Variable] 'of' context=[NamedElement|QualifiedName] ('assigned' | 'set' 'to' | 'with' 'value') value=Expression |
+	{AssertionParameter} 'parameter' variable=[Parameter] 'of' context=[Operation|QualifiedName] ('assigned' | 'set' 'to' | 'with' 'value') value=Expression
+;
+
+Assertion returns Assertion:
+	(
+		ReachabilityAssertion |
+		PositiveBinaryAssertion |
+		NegativeBinaryAssertion |
+		UnaryAssertion |
+		ClockInitialisationAssertion
+	)
+	('in' 'the' model=NewModelType)?
+	('with' //('constant' | 'constants')
+		parameters+=AssertionParameter
+		(
+			(
+				',' parameters+=AssertionParameter
+			)*
+			(',')? 'and' parameters+=AssertionParameter
+		)?
+	)? '.'?
+	
+;
+
+enum NewModelType returns CSPModel:
+	FAILURESDIVERGENCES = 'failures divergences model' |
+	TRACES = 'traces model' |
+	FAILURES = 'failures model' |
+	TICKTOCK = 'tick-tock model'
+;
+
+enum UnaryAssertionType returns AssertionType:
+	DEADLOCKFREE = 'deadlock-free' |
+	DIVERGENCEFREE = 'divergence-free' |
+	DETERMINISTIC = 'deterministic' |
+	TIMELOCKFREE = 'timelock-free'
+;
+
+enum TerminationAssertionType returns AssertionType:
+	TERMINATES = 'terminates'
+;
+
+enum NegativeTerminationAssertionType returns AssertionType:
+	TERMINATES = 'terminate'
+;
+
+enum PositiveBinaryAssertionType returns AssertionType:
+	REFINES = 'refines' |
+	EQUALS = 'equals'
+;
+
+enum RefineAssertionType returns AssertionType:
+	REFINES = 'refine'
+;
+
+enum EqualAssertionType returns AssertionType:
+	EQUALS = 'equal'
+;
+
+enum ReachableType returns AssertionType:
+	REACHABLE = 'reachable'
+;
+
+enum ClockInitialisedType returns AssertionType:
+	CLOCK_INITIALISED = 'initialised'
+;
+
+enum TimedUntimedBoth returns TUB:
+	DEFAULT | TIMED = 'timed' | UNTIMED = 'untimed'
+;
+
+ReachabilityAssertion returns BinaryAssertion:
+	(timed=TimedUntimedBoth)? 'assertion' name=ID ':'
+	left=[NamedElement|QualifiedName] 
+	'is' (
+		(negated?='not')? type=ReachableType
+	) 'in'
+	right=[NamedElement|QualifiedName]
+;
+
+PositiveBinaryAssertion returns BinaryAssertion:
+	(timed=TimedUntimedBoth)? 'assertion' name=ID ':'
+	left=[NamedElement|QualifiedName] 
+	type=PositiveBinaryAssertionType
+	right=[NamedElement|QualifiedName]
+;
+
+NegativeBinaryAssertion returns BinaryAssertion:
+	(timed=TimedUntimedBoth)? 'assertion' name=ID ':'
+	left=[NamedElement|QualifiedName] 
+	(
+		'does' negated?='not' type=RefineAssertionType |
+		'is' negated?='not' type=EqualAssertionType 'to'
+	)
+	right=[NamedElement|QualifiedName]
+;
+
+UnaryAssertion:
+	(timed=TimedUntimedBoth)? 'assertion' name=ID ':'
+	element=[NamedElement|QualifiedName] (
+		'is' (negated?='not')? (
+			type=UnaryAssertionType 
+		) |
+		type=TerminationAssertionType |
+		'does' negated?='not' type=NegativeTerminationAssertionType
+	)
+;
+
+ClockInitialisationAssertion returns UnaryAssertion:
+	'assertion' name=ID ':' 'clock' element=[Clock|QualifiedName] 'is' (negated?='not')? type=ClockInitialisedType
+;
+
+terminal CSP_CODE: 'csp-begin' -> 'csp-end';
+
+NamedElement: CSPProcess;
+
+CSPProcess: 
+	(timed=TimedUntimedBoth)? 'csp' name=ID 
+	('associated' 'to' associated+=[NamedElement|QualifiedName] 
+		(',' associated+=[NamedElement|QualifiedName])*
+	)? 
+	specification=CSP_CODE
+;
+
+////////////////////// Probabilistic assertions //////////////////////////////
+// dot expressions such as mod.ctrl_ref.stm_ref.
+//QualifiedNameToElement returns Ref:
+//    ModRef ({QualifiedNameToElement.ref=current}  "." next=[NamedElement])*
+//;
+//
+//ModRef returns Ref:
+//	{ModRef} ref=[RCModule]
+//;
+
+/* Here we need this QualifiedNameToElement in order to uniquely identify each element 
+ * by its full reference path, such as mod::ctrl_ref0::stm_ref0::S0
+ * This [NamedElement|Qualified] is not allowed to refer such element S0 by its full path
+ * It only allows State_machine::S0 which is not enough for our case.
+ * 
+ */
+QualifiedNameToElement returns QNRef:
+    NameRef ({QualifiedNameToElement.ref=current} '::' tail=[NamedElement])*
+;
+
+NameRef returns QNRef:
+	{RCRef} ':' rc=[RCPackage] |
+	{NameRef} name=[NamedElement]
+;
+
+pEventDir:
+	{PEventIN} in='in' | 
+	{PEventOUT} out='out'
+;
+
+pEvent:
+	ref=QualifiedNameToElement ('.' dir=pEventDir) 
+;
+
+pEventVal:
+	ref=pEvent '.' val='val'
+;
+
+// constant declaration (finally appear in the property file of PRISM)
+Constant returns Variable:
+	{Variable}'const' name=ID ':' type=Type
+;
+
+/*
+SetExpr:
+	{SetExpr} init=pExpression ':' final=pExpression ':' step=pExpression |
+	{SetExpr} '{' (values+=pExpression (',' values+=pExpression)*)? '}'
+;
+*/
+
+Config:
+	var=QualifiedNameToElement //[Variable|QualifiedName]
+	((('assigned' | 'set' 'to' | 'with' 'value') value=pExpression)
+		|
+	 ('from' 'set' values=pExpression) // SetExp or SetRange
+	)
+;
+
+// constants setting
+Constants:
+	'constants' (name=ID ':')
+		configs+=Config
+			(
+				',' configs+=Config
+			)*
+			((',')? 'and' configs+=Config)?
+;
+
+///////////////////// Context //////////////////
+/*ValueProb:
+    '(' value=Expr ',' prob=FLOAT ')'
+;
+
+MapProb: 
+   '['
+       probs+=ValueProb 
+   	    (
+   	    	',' probs+=ValueProb
+   	    )*
+   	    ((',')? 'and' probs+=ValueProb)?
+   ']'
+;
+
+RangeProb: 
+    ('from' start=INT 'to' end=INT 'with' ('uniform'))
+;
+
+InputConfig:
+	var=QualifiedNameToElement
+	(range=RangeProb
+	 |
+	 ('from' 'map' map=MapProb)
+	)
+;
+
+RPContext: 
+    'context' (name=ID ':')
+        inconfigs+=InputConfig
+            (
+                ',' inconfigs+=InputConfig
+            )*
+            ((',')? 'and' inconfigs+=InputConfig)?
+;*/
+
+///////////////////// Functions and operations //////////////////
+FPara:
+	name = ID
+;
+
+PFunction:
+	'pfunction' name=ID '(' 
+		(
+			parameters += FPara
+			(',' parameters += FPara)*
+		)?
+	')' '=' '{' 'return' expr=pExpression '}'
+;
+
+PAssignment:
+	'(' var = QualifiedNameToElement '=' expr = pExpression ')'
+;
+
+POperation:
+	'poperation' name=ID '(' 
+		(
+			parameters += FPara
+			(',' parameters += FPara)*
+		)?
+	')' '=' '{'
+		(
+			assigns += PAssignment
+			('and' assigns += PAssignment)*
+		)
+	'}'
+;
+
+Definitions: 
+	'defs' name=ID ':'
+	(
+		functions+=PFunction |
+		operations+=POperation
+	)
+	(
+		functions+=PFunction |
+		operations+=POperation
+	)*
+;
+
+///////////////////// Property modules //////////////////
+pType:
+	{PBOOL} 'bool' |
+	{PRange} '[' start=pExpression 'to' end=pExpression ']'
+;
+
+pVariable:
+	name=ID ':' type=pType ('init' initial=pExpression)? ';'
+;
+
+pUpdate:
+	'(' (prob=pExpression ':')? '@' var=[pVariable] '=' val=pExpression ')'
+;
+
+pCommand:
+	'[' (action=pEvent)? ']' guard=pExpression '->' (((ups+=pUpdate) ('&' ups+= pUpdate)*) | 'skip') ';'
+;
+
+pModule:
+	'pmodule' name=ID 
+	'{'
+		(variables+=pVariable)*
+		(commands+=pCommand)
+		(commands+=pCommand)*
+	'}'
+;
+
+pModules:
+	'pmodules' name=ID ':'
+	(
+		modules+=pModule
+	)
+	(
+		modules+=pModule
+	)*
+;
+///////////////////// Expr for probabilistic properties //////////////////
+pExpression:
+	pIff
+;
+
+pIff returns pExpression:
+	pImplies ({pIff.left=current} 'iff' right=pImplies)*
+;
+
+pImplies returns pExpression:
+	pOr ({pImplies.left=current} '=>' right=pOr)*
+	;
+	
+pOr returns pExpression:
+	pAnd ({pOr.left=current} '\\/' right=pAnd)*
+;
+
+pAnd returns pExpression:
+	pNot ({pAnd.left=current} '/\\' right=pNot)* 
+;
+
+pNot returns pExpression:
+	{pNot} 'not' exp=pNot |
+	UntilPathFormula
+;
+
+UntilPathFormula returns pExpression:
+	pComp ({UntilFormula.left=current} ('Until' | 'until') (b=Bound)? right=pExpression)?
+;
+
+pComp returns pExpression:
+	pIfExpression (
+		(
+			{pEquals.left=current} '==' | 
+			{pDifferent.left=current} '!=' |
+			{pGreaterThan.left=current} '>' |
+			{pGreaterOrEqual.left=current} '>=' |
+			{pLessThan.left=current} '<' |
+			{pLessOrEqual.left=current} '<='	
+		)
+		right=pIfExpression
+	)*
+;
+
+pIfExpression returns pExpression:
+	{pIfExpression} 'if' condition=pExpression 'then' ifexp=pExpression 'else' elseexp=pExpression 'end' |
+	pPlusMinus
+;
+
+pPlusMinus returns pExpression:
+	pMultDivMod (
+		({pPlus.left=current} '+' | {pMinus.left=current} '-')
+		right=pMultDivMod
+	)*
+;
+
+pMultDivMod returns pExpression:
+	pNeg (
+		({pMult.left=current} '*' |
+		 {pDiv.left=current} '/' |
+		 {pModulus.left=current} '%'
+		)
+		right=pNeg
+	)*
+;
+
+pNeg returns pExpression:
+	{pNeg} '-' exp=pNeg |
+	pArrayExp
+;
+
+pArrayExp returns pExpression:
+	pAtomic (
+		{pArrayExp.value=current}'[' parameters+=pExpression (',' parameters+=pExpression)* ']' 
+	)?
+;
+
+pAtomic returns pExpression:
+	{pIntegerExp} value=INT |
+	{pFloatExp} value=FLOAT |
+	{pBooleanExp} value=BOOLEAN |
+	// {EnumExp} type=[Enumeration] '::' literal=[Literal] |
+	{pParExp} '(' exp=pExpression ')' | // Par pExpression
+	'{'(
+		pExpression (
+			{pSetExp.values+=current} (',' values+=pExpression)* '}' |
+			{pSetRanges.start=current} 'to' end=pExpression ('by' 'step' step=pExpression)?'}'
+		)
+	) |
+	{pRefExpr} ref=QualifiedNameToElement |
+	{pVariableRef} '@' (mods=[pModules] '::' mod=[pModule] '::')? ref=[pVariable] |
+	{pEventRef} ref=pEventVal |
+	{pStmInStateBoolExpr} parent=QualifiedNameToElement 'is' 'in' child=QualifiedNameToElement |
+	{pFormulaRefExpr} '$' fname=[Formula] |
+	{pRefFPara} '$$' pname=[FPara] | /* a parameter of a function definition */
+	{pFCallExpr} '&' pfname=[PFunction] '(' 
+			(
+				arguments += pExpression
+				(',' arguments += pExpression)*
+			)?
+		')' |
+	{pStateFormula} stform=TerminalStFormula |
+	{pPathFormula} ptform=PathFormula |
+	{pRPathFormula} rptform=RPathFormula
+;
+
+Label:
+	{Label} 'label' name=ID '=' expr=pExpression 
+;
+
+Formula:
+	{Formula} 'formula' name=ID '=' expr=pExpression
+;
+
+// terminal REWARD_CODE: 'rewards' -> 'endrewards';
+
+Rewards:
+	{Rewards} 'rewards' name=ID '=' (rewards+=Reward)+ 'endrewards'
+;
+
+Reward:
+	('[' event=pEvent ']')? guard=pExpression ':' value=pExpression ';'
+;
+
+ProbAssertion:
+	 'prob' 
+	 	(('property' name=ID ':' 
+	 		(form=pExpression)
+	 	 ) | 
+		 ('generate' 'path' pname=ID ':'	
+		 	'using' 'simulation' 'for'  
+			pathspec=SimPathSpec
+			('up' 'to' maxsteps = IntNum 'steps')?
+		 )
+		)
+		(
+			('with' ('constant' | 'constants'))
+			(configs+=Config 
+				(',' configs+=Config)*
+				((',')? 'and' configs+=Config)?
+			|
+		 	 const=[Constants]
+		 	)
+		)?
+		/*(
+            ('with' 'robotic' 'platform')
+            (inconfigs+=InputConfig
+				(',' inconfigs+=InputConfig)*
+				((',')? 'and' inconfigs+=InputConfig)?
+			|
+		 	 context=[RPContext]
+		 	)
+        )?*/
+        (
+        	('with' 'definitions')
+	        (
+	        	(
+		        	(
+						functions+=PFunction |
+						operations+=POperation
+					)
+					(
+						functions+=PFunction |
+						operations+=POperation
+					)*
+				) |
+	        	def=[Definitions]
+        	)
+        )?
+        (
+        	('with' 'modules')
+        	(
+        		(
+        			(
+						modules+=pModule
+					)
+					(
+						modules+=pModule
+					)*
+				) |
+        		mods=[pModules]
+        	)
+        )?
+		('with' 'cmdoptions' opt=STRING)?
+;
+
+// Use INT directly in such ('with' repeats = INT 'repeats')? will make 
+// it not possible to check if (Deadlock.repeats !== null) in the code generator (xtext)
+IntNum:
+	v = INT
+;
+
+SimPathSpec:
+	{PathSteps} steps = IntNum 'steps' |
+	{Deadlock} 'deadlock' ('with' repeats = IntNum 'repeats')?
+;
+
+TerminalStFormula returns pExpression:
+	{OpPFormula} pform=PFormula |
+	{OpRFormula} rform=RFormula |
+	{OpAFormula} aform=AFormula |
+	{OpEFormula} eform=EFormula |
+	{LabelFormula} lref=LabelRef
+;
+
+LabelRef:
+	{LabelRef} '#' name=[Label] |
+	{LabelDeadlock} 'deadlock' |
+	{LabelInit} 'init'
+;
+
+PFormula:
+	('Prob') (bp=Bound | qp=Query) 'of' '[' fp=pExpression ']'
+		(mp=UseMethod)?
+;
+
+RFormula:
+	('Reward') ('{' name=[Rewards] '}')? (br=Bound | qr=Query) 'of' '[' fr=RPathFormula ']'
+		(mr=UseMethod)?
+;
+
+AFormula:
+	('Forall') '[' fa=pExpression ']'
+;
+
+EFormula:
+	('Exists') '[' fa=pExpression ']'
+;
+
+Bound:
+	op=('>' | '>=' | '<' | '<=') exp=pExpression
+;
+
+Query:
+	{QuesQuery} '=' '?' |
+	{MinQuesQuery} 'min' '=' '?' |
+	{MaxQuesQuery} 'max' '=' '?'
+;
+
+PathFormula returns pExpression:
+	{NextFormula} ('Next') f=pExpression |
+	//pExpression ({UntilFormula.st=current} ('Until' | 'until') (b=Bound)? f=pExpression)? |
+	{FinalFormula} ('Finally') (b=Bound)? f=pExpression |
+	{GlobalFormula} ('Globally') (b=Bound)? f=pExpression |
+	{WeakFormula} 'Weak' 'Until' (b=Bound)? f=pExpression |
+	{RelFormula} 'Release' (b=Bound)? f=pExpression 
+;
+
+RPathFormula returns pExpression:
+	{ReachAwardFormula} ('Reachable') st1=pExpression |
+	{CoSafeLTLAwardFormula} ('LTL') st1=pExpression |
+	{CumulAwardFormula} ('Cumul') exp=pExpression |
+	{TotalAwardFormula} ('Total') /*exp=pExpression |
+	{InstaAwardFormula} 'I=' exp=Expr */
+;
+
+UseMethod:
+	'using' 'sim' 'with' (sim=SimMethod) (',' 'and' 'pathlen' '=' pexp=pExpression)?
+;
+
+SimMethod:
+	{CISimMethod} 'CI' ('at' ci=CiMethod)? |
+	{ACISimMethod} 'ACI' ('at' ci=CiMethod)? |
+	{APMCSimMethod} 'APMC' ('at' ap=APMCMethod)? | 
+	{SPRTSimMethod} 'SPRT' ('at' sp=SPRTMethod)?
+;
+
+CiMethod:
+	((',')? 'w' '=' w=pExpression)? & ((',')? 'alpha' '=' alpha=pExpression)? & ((',')? 'n' '=' n=pExpression)?
+;
+
+APMCMethod:
+	((',')? 'epsilon' '=' epsilon=pExpression)? & ((',')? 'delta' '=' delta=pExpression)? & ((',')? 'n' '=' n=pExpression)?
+;
+
+SPRTMethod:
+	((',')? 'delta' '=' delta=pExpression) & ((',')? 'alpha' '=' alpha=pExpression)
+;

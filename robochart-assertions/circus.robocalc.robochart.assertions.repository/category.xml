@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<site>
+	<feature id="circus.robocalc.robochart.assertions.feature" version="0.0.0">
+		<category name="robochart"/>
+	</feature>
+	<feature id="circus.robocalc.robochart.assertions.feature.source" version="0.0.0">
+		<category name="robochart.source"/>
+	</feature>
+	<category-def name="robochart" label="RoboChart"/>
+   	<category-def name="robochart.source" label="RoboChart (Source)"/>
+</site>
